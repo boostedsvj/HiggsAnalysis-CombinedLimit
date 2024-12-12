@@ -729,10 +729,13 @@ class ShapeBuilder(ModelBuilder):
                 raise RuntimeError("Failed to find %s in file %s (from pattern %s, %s)" % (wname, finalNames[0], names[1], names[0]))
             if self.wsp.ClassName() == "RooWorkspace":
                 ret = self.wsp.data(oname)
+                retType = 'data'
                 if not ret:
                     ret = self.wsp.pdf(oname)
+                    retType = 'pdf'
                 if not ret:
                     ret = self.wsp.function(oname)
+                    retType = 'function'
                 if not ret:
                     if allowNoSyst:
                         return None
@@ -785,6 +788,21 @@ class ShapeBuilder(ModelBuilder):
                             )
                         else:
                             self.out.safe_import(norm, ROOT.RooFit.RecycleConflictNodes())
+                    # import all the parameters of the pdf
+                    if retType=='pdf':
+                        accessors = {
+                            "RooGenericPdf": "dependents",
+                            "RooParametricShapeBinPdf": "getPars",
+                        }
+                        def import_pars(pdf):
+                            accessor = accessors[pdf.ClassName()]
+                            for p in getattr(pdf,accessor)():
+                                self.out.safe_import(p, ROOT.RooFit.RecycleConflictNodes())
+                        if ret.InheritsFrom("RooMultiPdf"):
+                            for pdf in [ret.getPdf(i) for i in range(ret.getNumPdfs())]:
+                                import_pars(pdf)
+                        else:
+                            import_pars(ret)
                 if self.options.verbose > 2:
                     print("import (%s,%s) -> %s\n" % (finalNames[0], objname, ret.GetName()))
                 return ret
