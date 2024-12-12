@@ -40,6 +40,7 @@ std::vector<RooRealVar *> MultiDimFit::poiVars_;
 std::vector<float>        MultiDimFit::poiVals_;
 RooArgList                MultiDimFit::poiList_;
 float                     MultiDimFit::deltaNLL_ = 0;
+int                       MultiDimFit::status_ = 0;
 unsigned int MultiDimFit::points_ = 50;
 unsigned int MultiDimFit::firstPoint_ = 0;
 unsigned int MultiDimFit::lastPoint_  = std::numeric_limits<unsigned int>::max();
@@ -179,6 +180,7 @@ bool MultiDimFit::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooS
     // Process POI not in list
     nOtherFloatingPoi_ = 0;
     deltaNLL_ = 0;
+    status_ = 0;
     int nConstPoi=0;
     std::string setConstPOI;
     for (RooAbsArg *a : *mc_s->GetParametersOfInterest()) {
@@ -209,6 +211,7 @@ bool MultiDimFit::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooS
             std::cout << "\n ---------------------------" <<std::endl;
             std::cout << "\n " <<std::endl;
         }
+        else if (saveFitResult_ && !robustHesse_) status_ = res->status();
         if (algo_ == Impact && res.get()) {
             // Set the floating parameters back to the best-fit value
             // before we write an entry into the output TTree
@@ -442,6 +445,7 @@ void MultiDimFit::initOnce(RooWorkspace *w, RooStats::ModelConfig *mc_s) {
 	Combine::addBranch(specifiedCatNames_[i].c_str(), &specifiedCatVals_[i], (specifiedCatNames_[i]+"/I").c_str()); 
     }
     Combine::addBranch("deltaNLL", &deltaNLL_, "deltaNLL/F");
+    Combine::addBranch("status", &status_, "status/I");
 }
 
 void MultiDimFit::doSingles(RooFitResult &res)
@@ -722,7 +726,7 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
 		    specifiedCat_,
 		    specifiedCatVals_,
 		    nOtherFloatingPoi_);
-            randStartPt.doRandomStartPt1DGridScan(x, n, poiVals_, poiVars_, params, snap, deltaNLL_, nll0, minim);
+            randStartPt.doRandomStartPt1DGridScan(x, n, poiVals_, poiVars_, params, snap, deltaNLL_, nll0, minim, status_);
 
         } // End of the loop over scan points
     } else if (n == 2) {
@@ -825,7 +829,7 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
 			specifiedCat_,
 			specifiedCatVals_,
 			nOtherFloatingPoi_);
-                randStartPt.doRandomStartPt2DGridScan(x, y, n, poiVals_, poiVars_, params, snap, deltaNLL_, nll0, gridType_, deltaX, deltaY, minim);
+                randStartPt.doRandomStartPt2DGridScan(x, y, n, poiVals_, poiVars_, params, snap, deltaNLL_, nll0, gridType_, deltaX, deltaY, minim, status_);
             } //End of loop over y scan points
         } //End of loop over x scan points
 

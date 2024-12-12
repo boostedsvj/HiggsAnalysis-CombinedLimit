@@ -117,11 +117,8 @@ std::map<std::string, std::vector<float>> RandStartPt::getRangesDictFromInString
     return out_range_dict;
 }
 
-void RandStartPt::commitBestNLLVal(unsigned int idx, float &nllVal, double &probVal){//, RooAbsReal& nll_){
-    if (idx==0){
-        Combine::commitPoint(true, /*quantile=*/probVal);
-        nllVal = nll_.getVal();
-    } else if (nll_.getVal() < nllVal){
+void RandStartPt::commitBestNLLVal(unsigned int idx, float &nllVal, double &probVal){
+    if (idx==0 or nll_.getVal() < nllVal){
         Combine::commitPoint(true, /*quantile=*/probVal);
         nllVal = nll_.getVal();
     }
@@ -151,7 +148,7 @@ void RandStartPt::setValSpecifiedObjs(){
     }
 }
 
-void RandStartPt::doRandomStartPt1DGridScan(double &xval, unsigned int poiSize, std::vector<float> &poival, std::vector<RooRealVar* > &poivars, std::unique_ptr <RooArgSet> &param, RooArgSet &snap, float &deltaNLL, double &nll_init, CascadeMinimizer &minimObj){
+void RandStartPt::doRandomStartPt1DGridScan(double &xval, unsigned int poiSize, std::vector<float> &poival, std::vector<RooRealVar* > &poivars, std::unique_ptr <RooArgSet> &param, RooArgSet &snap, float &deltaNLL, double &nll_init, CascadeMinimizer &minimObj, int &status){
     float current_best_nll = 0;
     //the nested vector to hold random starting points to try
     std::vector<std::vector<float>> nested_vector_of_wc_vals =  vectorOfPointsToTry ();
@@ -181,12 +178,13 @@ void RandStartPt::doRandomStartPt1DGridScan(double &xval, unsigned int poiSize, 
              double prob = ROOT::Math::chisquared_cdf_c(qN, poiSize + nOtherFloatingPOI_);
              setValSpecifiedObjs();
              //finally, commit best NLL value
+             status = minimObj.status();
              commitBestNLLVal(start_pt_idx, current_best_nll, prob);
          }
     }
 }
 
-void RandStartPt::doRandomStartPt2DGridScan(double &xval, double &yval, unsigned int poiSize, std::vector<float> &poival, std::vector<RooRealVar* > &poivars, std::unique_ptr <RooArgSet> &param, RooArgSet &snap, float &deltaNLL, double &nll_init, MultiDimFit::GridType gridType, double deltaX, double deltaY, CascadeMinimizer &minimObj){
+void RandStartPt::doRandomStartPt2DGridScan(double &xval, double &yval, unsigned int poiSize, std::vector<float> &poival, std::vector<RooRealVar* > &poivars, std::unique_ptr <RooArgSet> &param, RooArgSet &snap, float &deltaNLL, double &nll_init, MultiDimFit::GridType gridType, double deltaX, double deltaY, CascadeMinimizer &minimObj, int &status){
     float current_best_nll = 0;
     //the nested vector to hold random starting points to try
     std::vector<std::vector<float>> nested_vector_of_wc_vals =  vectorOfPointsToTry ();
@@ -229,6 +227,7 @@ void RandStartPt::doRandomStartPt2DGridScan(double &xval, double &yval, unsigned
             double qN = 2*(deltaNLL);
             double prob = ROOT::Math::chisquared_cdf_c(qN, poiSize + nOtherFloatingPOI_);
             setValSpecifiedObjs();
+            status = minimObj.status();
             commitBestNLLVal(start_pt_idx, current_best_nll, prob);
         }
         if (gridType == MultiDimFit::G3x3){
@@ -257,6 +256,7 @@ void RandStartPt::doRandomStartPt2DGridScan(double &xval, double &yval, unsigned
                     double qN = 2*(deltaNLL);
                     double prob = ROOT::Math::chisquared_cdf_c(qN, poiSize + nOtherFloatingPOI_);
                     setValSpecifiedObjs();
+                    status = minimObj.status();
                     commitBestNLLVal(start_pt_idx, current_best_nll, prob);
                 }
             }
