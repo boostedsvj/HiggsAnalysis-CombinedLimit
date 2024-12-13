@@ -119,6 +119,7 @@ std::map<std::string, std::vector<float>> RandStartPt::getRangesDictFromInString
 
 void RandStartPt::commitBestNLLVal(unsigned int idx, float &nllVal, double &probVal){
     if (idx==0 or nll_.getVal() < nllVal){
+        if (verbosity_ > 1) std::cout << "Committing point " << idx << " w/ nll " << nll_.getVal() << ", ref nll " << nllVal << std::endl;
         Combine::commitPoint(true, /*quantile=*/probVal);
         nllVal = nll_.getVal();
     }
