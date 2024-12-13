@@ -33,9 +33,10 @@ class RandStartPt {
       std::vector<int> &specifiedcatvals_;
       unsigned int nOtherFloatingPOI_;
       std::map<std::string, std::vector<float>> rand_ranges_dict_;
+      std::map<std::string, std::vector<float>> prev_dict_;
   public:
       RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedvars, std::vector<float> &specifiedvals, bool skipdefaultstart, std::string parameterRandInitialValranges, int numrandpts, int verbose, bool fastscan, bool hasmaxdeltaNLLforprof, float maxdeltaNLLforprof, std::vector<std::string> &specifiednuis, std::vector<std::string> &specifiedfuncnames, std::vector<RooAbsReal*> &specifiedfunc, std::vector<float> &specifiedfuncvals, std::vector<std::string> &specifiedcatnames, std::vector<RooCategory*> &specifiedcat, std::vector<int> &specifiedcatvals, unsigned int nOtherFloatingPOI);
-      std::map<std::string, std::vector<float>> getRangesDictFromInString(std::string params_ranges_string_in);
+      void getRangesDictFromInString(std::string params_ranges_string_in);
       std::vector<std::vector<float>> vectorOfPointsToTry ();
       void commitBestNLLVal(unsigned int idx, float &nllVal, double &probVal);
       void setProfPOIvalues(unsigned int startptIdx, std::vector<std::vector<float>> &nested_vector_of_wc_vals);

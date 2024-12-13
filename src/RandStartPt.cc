@@ -40,8 +40,8 @@ RandStartPt::RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedva
     specifiedcatvals_(specifiedcatvals),
     nOtherFloatingPOI_(nOtherFloatingPOI)
     {
-        if (parameterRandInitialValranges_ != "") {
-            rand_ranges_dict_ = RandStartPt::getRangesDictFromInString(parameterRandInitialValranges_);
+        if (!parameterRandInitialValranges_.empty()) {
+            RandStartPt::getRangesDictFromInString(parameterRandInitialValranges_);
         }
     }
 
@@ -63,18 +63,30 @@ std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (){
     for (int pt_idx = 0; pt_idx<numrandpts_; pt_idx++){
         std::vector<float> wc_vals_vec;
         for (int prof_param_idx=0; prof_param_idx<n_prof_params; prof_param_idx++) {
-            if (parameterRandInitialValranges_ != "") {
-                if (rand_ranges_dict_.find(specifiedvars_[prof_param_idx]->GetName()) != rand_ranges_dict_.end()){   //if the random starting point range for this floating POI was supplied during runtime
-                    float rand_range_lo = rand_ranges_dict_[specifiedvars_[prof_param_idx]->GetName()][0];
-                    float rand_range_hi = rand_ranges_dict_[specifiedvars_[prof_param_idx]->GetName()][1];
+            bool no_rand = false;
+            if (!parameterRandInitialValranges_.empty()) {
+                const auto& poi_name = specifiedvars_[prof_param_idx]->GetName();
+                if (prev_dict_.find(poi_name) != prev_dict_.end()){ //if the value from the previous grid step should be used as the initial value
+                    float prev_val = prev_dict_[poi_name][0];
+                    float prev_err = prev_dict_[poi_name][1];
+                    float prev_fac = prev_dict_[poi_name][2];
+                    float prev_lo = prev_val - prev_fac*prev_err;
+                    float prev_hi = prev_val + prev_fac*prev_err;
+                    prof_start_pt_range_max = std::max(prev_lo, prev_hi);
+                    if (prev_fac==0) no_rand = true;
+                }
+                else if (rand_ranges_dict_.find(poi_name) != rand_ranges_dict_.end()){   //if the random starting point range for this floating POI was supplied during runtime
+                    float rand_range_lo = rand_ranges_dict_[poi_name][0];
+                    float rand_range_hi = rand_ranges_dict_[poi_name][1];
                     prof_start_pt_range_max = std::max(abs(rand_range_lo),abs(rand_range_hi));
                 }
                 else {   //if the random starting point range for this floating POI was not supplied during runtime, set the default low to -20 and high to +20
-                    rand_ranges_dict_.insert({specifiedvars_[prof_param_idx]->GetName(),{-1*prof_start_pt_range_max,prof_start_pt_range_max}});
+                    rand_ranges_dict_.insert({poi_name,{-1*prof_start_pt_range_max,prof_start_pt_range_max}});
                 }
             }
             //Get a random number in the range [-prof_start_pt_range_max,prof_start_pt_range_max]
-            float rand_num = (rand()*2.0*prof_start_pt_range_max)/RAND_MAX - prof_start_pt_range_max;
+            //unless just using prev value directly w/ no variation
+            float rand_num = no_rand ? prof_start_pt_range_max : (rand()*2.0*prof_start_pt_range_max)/RAND_MAX - prof_start_pt_range_max;
             wc_vals_vec.push_back(rand_num);
         }
         wc_vals_vec_of_vec.push_back(wc_vals_vec);
@@ -96,8 +108,12 @@ std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (){
 }
 
 // Extract the ranges map from the input string
-// // Assumes the string is formatted with colons like "poi_name1=lo_lim,hi_lim:poi_name2=lo_lim,hi_lim"
-std::map<std::string, std::vector<float>> RandStartPt::getRangesDictFromInString(std::string params_ranges_string_in) {
+// Assumes the string is formatted with colons like "poi_name1=lo_lim,hi_lim:poi_name2=lo_lim,hi_lim"
+// Alternative form: poi_name1=prev,none:po1_name2=prev,2*err
+// where prev indicates the poi value from the previous step in the grid should be used (only makes sense in 1d)
+// and x*err indicates that the range should be some factor multiplied by the poi error from the previous step
+// if none, no random variation of this poi
+void RandStartPt::getRangesDictFromInString(std::string params_ranges_string_in) {
     std::map<std::string, std::vector<float>> out_range_dict;
     std::vector<std::string> params_ranges_string_lst;
     boost::split(params_ranges_string_lst, params_ranges_string_in, boost::is_any_of(":"));
@@ -108,11 +124,24 @@ std::map<std::string, std::vector<float>> RandStartPt::getRangesDictFromInString
             std::cout << "Error parsing expression : " << params_ranges_string_lst[p] << std::endl;
         }
         std::string wc_name =params_ranges_string[0];
-        float lim_lo = atof(params_ranges_string[1].c_str());
-        float lim_hi = atof(params_ranges_string[2].c_str());
-        out_range_dict.insert({wc_name,{lim_lo,lim_hi}});
+        if (params_ranges_string[1]=="prev"){
+            float factor = 0;
+            if (params_ranges_string[2]!="none"){
+                std::vector<std::string> err_range_string;
+                boost::split(err_range_string, params_ranges_string[2], boost::is_any_of("*"));
+                if (err_range_string.size()==1) factor = 1;
+                else if (err_range_string.size()==2) factor = atof(err_range_string[0].c_str());
+                else std::cout << "Error parsing expression : " << params_ranges_string[2] << std::endl;
+            }
+            //dict form: prev value (updated in place), prev error (updated in place), range factor (constant)
+            prev_dict_.insert({wc_name,{0,0,factor}});
+        }
+        else {
+            float lim_lo = atof(params_ranges_string[1].c_str());
+            float lim_hi = atof(params_ranges_string[2].c_str());
+            rand_ranges_dict_.insert({wc_name,{lim_lo,lim_hi}});
+        }
     }
-    return out_range_dict;
 }
 
 void RandStartPt::commitBestNLLVal(unsigned int idx, float &nllVal, double &probVal){
@@ -120,6 +149,18 @@ void RandStartPt::commitBestNLLVal(unsigned int idx, float &nllVal, double &prob
         if (verbosity_ > 1) std::cout << "Committing point " << idx << " w/ nll " << nll_.getVal() << ", ref nll " << nllVal << ", diff " << nllVal - nll_.getVal() << std::endl;
         Combine::commitPoint(true, /*quantile=*/probVal);
         nllVal = nll_.getVal();
+
+        //update prev values
+        if (!prev_dict_.empty()){
+            for (size_t prof_param_idx=0; prof_param_idx<specifiedvars_.size(); prof_param_idx++) {
+                const auto& poi_name = specifiedvars_[prof_param_idx]->GetName();
+                if (prev_dict_.find(poi_name) != prev_dict_.end()){
+                    prev_dict_[poi_name][0] = specifiedvars_[prof_param_idx]->getVal();
+                    prev_dict_[poi_name][1] = specifiedvars_[prof_param_idx]->getError();
+					if (verbosity_ > 1) std::cout << "Updating prev value for " << poi_name << ": " << prev_dict_[poi_name][0] << " +- " << prev_dict_[poi_name][1] << std::endl;
+                }
+            }
+        }
     }
 }
 
@@ -128,10 +169,10 @@ void RandStartPt::setProfPOIvalues(unsigned int startptIdx, std::vector<std::vec
     for (unsigned int var_idx = 0; var_idx<specifiedvars_.size(); var_idx++){
         if (verbosity_ > 1) std::cout << "\t\tThe var name: " << specifiedvars_[var_idx]->GetName() << std::endl;
         if (verbosity_ > 1) std::cout << "\t\t\tRange before: " << specifiedvars_[var_idx]->getMin() << " " << specifiedvars_[var_idx]->getMax() << std::endl;
-        if (verbosity_ > 1) std::cout << "\t\t\t" << specifiedvars_[var_idx]->GetName() << " before setting: " << specifiedvars_[var_idx]->getVal() << " += " << specifiedvars_[var_idx]->getError() << std::endl;
+        if (verbosity_ > 1) std::cout << "\t\t\t" << specifiedvars_[var_idx]->GetName() << " before setting: " << specifiedvars_[var_idx]->getVal() << " +- " << specifiedvars_[var_idx]->getError() << std::endl;
         specifiedvars_[var_idx]->setVal(nested_vector_of_wc_vals.at(startptIdx).at(var_idx));
         if (verbosity_ > 1) std::cout << "\t\t\tRange after: " << specifiedvars_[var_idx]->getMin() << " " << specifiedvars_[var_idx]->getMax() << std::endl;   
-        if (verbosity_ > 1) std::cout << "\t\t\t" << specifiedvars_[var_idx]->GetName() << " after  setting: " << specifiedvars_[var_idx]->getVal() << " += " << specifiedvars_[var_idx]->getError() << std::endl;   
+        if (verbosity_ > 1) std::cout << "\t\t\t" << specifiedvars_[var_idx]->GetName() << " after  setting: " << specifiedvars_[var_idx]->getVal() << " +- " << specifiedvars_[var_idx]->getError() << std::endl;   
     }
 } 
 
