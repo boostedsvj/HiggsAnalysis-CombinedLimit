@@ -280,11 +280,11 @@ def addDatacardParserOptions(parser):
         help="Simplify MH dependent objects: 'fixed', 'pol<N>' with N=0..4",
     )
     parser.add_option(
-        "--X-assign-flatParam-prior",
+        "--X-no-flatParam-prior",
         dest="flatParamPrior",
-        default=False,
-        action="store_true",
-        help="Assign RooUniform pdf for flatParam NPs",
+        default=True,
+        action="store_false",
+        help="Skip RooUniform pdf for flatParam NPs",
     )
 
 
