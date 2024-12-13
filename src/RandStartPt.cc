@@ -39,8 +39,11 @@ RandStartPt::RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedva
     specifiedcat_(specifiedcat),
     specifiedcatvals_(specifiedcatvals),
     nOtherFloatingPOI_(nOtherFloatingPOI)
-
-    {}
+    {
+        if (parameterRandInitialValranges_ != "") {
+            rand_ranges_dict_ = RandStartPt::getRangesDictFromInString(parameterRandInitialValranges_);
+        }
+    }
 
 std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (){
     std::vector<std::vector<float>> wc_vals_vec_of_vec = {};
@@ -56,36 +59,31 @@ std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (){
 
     // Append the random points to the vector of points to try
     float prof_start_pt_range_max = 20.0; // Default to 20 if we're not asking for custom ranges
-    std::map<std::string, std::vector<float>> rand_ranges_dict;
-    if (parameterRandInitialValranges_ != "") {
-        rand_ranges_dict = RandStartPt::getRangesDictFromInString(parameterRandInitialValranges_);
-    }
 
     for (int pt_idx = 0; pt_idx<numrandpts_; pt_idx++){
         std::vector<float> wc_vals_vec;
         for (int prof_param_idx=0; prof_param_idx<n_prof_params; prof_param_idx++) {
             if (parameterRandInitialValranges_ != "") {
-                if (rand_ranges_dict.find(specifiedvars_[prof_param_idx]->GetName()) != rand_ranges_dict.end()){   //if the random starting point range for this floating POI was supplied during runtime
-                    float rand_range_lo = rand_ranges_dict[specifiedvars_[prof_param_idx]->GetName()][0];
-                    float rand_range_hi = rand_ranges_dict[specifiedvars_[prof_param_idx]->GetName()][1];
+                if (rand_ranges_dict_.find(specifiedvars_[prof_param_idx]->GetName()) != rand_ranges_dict_.end()){   //if the random starting point range for this floating POI was supplied during runtime
+                    float rand_range_lo = rand_ranges_dict_[specifiedvars_[prof_param_idx]->GetName()][0];
+                    float rand_range_hi = rand_ranges_dict_[specifiedvars_[prof_param_idx]->GetName()][1];
                     prof_start_pt_range_max = std::max(abs(rand_range_lo),abs(rand_range_hi));
                 }
                 else {   //if the random starting point range for this floating POI was not supplied during runtime, set the default low to -20 and high to +20
-                    rand_ranges_dict.insert({specifiedvars_[prof_param_idx]->GetName(),{-20.0,20.0}});
+                    rand_ranges_dict_.insert({specifiedvars_[prof_param_idx]->GetName(),{-1*prof_start_pt_range_max,prof_start_pt_range_max}});
                 }
             }
             //Get a random number in the range [-prof_start_pt_range_max,prof_start_pt_range_max]
             float rand_num = (rand()*2.0*prof_start_pt_range_max)/RAND_MAX - prof_start_pt_range_max;
             wc_vals_vec.push_back(rand_num);
         }
-    wc_vals_vec_of_vec.push_back(wc_vals_vec);
-
+        wc_vals_vec_of_vec.push_back(wc_vals_vec);
     }
 
     //Print vector of points to try
     if (verbosity_ > 1) {
         std::cout<<"List of points to try for : "<<std::endl;
-        for (auto vals_vec: wc_vals_vec_of_vec){
+        for (const auto& vals_vec: wc_vals_vec_of_vec){
             int index = 0;
             std::cout<<"\tThe vals at this point: "<<std::endl;
             for (auto val:vals_vec){
@@ -119,7 +117,7 @@ std::map<std::string, std::vector<float>> RandStartPt::getRangesDictFromInString
 
 void RandStartPt::commitBestNLLVal(unsigned int idx, float &nllVal, double &probVal){
     if (idx==0 or nll_.getVal() < nllVal){
-        if (verbosity_ > 1) std::cout << "Committing point " << idx << " w/ nll " << nll_.getVal() << ", ref nll " << nllVal << std::endl;
+        if (verbosity_ > 1) std::cout << "Committing point " << idx << " w/ nll " << nll_.getVal() << ", ref nll " << nllVal << ", diff " << nllVal - nll_.getVal() << std::endl;
         Combine::commitPoint(true, /*quantile=*/probVal);
         nllVal = nll_.getVal();
     }

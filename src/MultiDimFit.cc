@@ -650,7 +650,7 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
             std::cout<<"\n************************************************************************************"<<std::endl;
             std::cout<<"* Random starting point set to non-zero value. This will take some time to complete. *"<<std::endl;
             std::cout<<"************************************************************************************\n"<<std::endl;
-	    CombineLogger::instance().log("MultiDimFit.cc",__LINE__,"Random starting point set to non-zero value. This will take some time to complete.",__func__);
+            CombineLogger::instance().log("MultiDimFit.cc",__LINE__,"Random starting point set to non-zero value. This will take some time to complete.",__func__);
             srand(randPointsSeed_);
         }
         //else {
@@ -670,6 +670,27 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
         if (lastPoint_ == std::numeric_limits<unsigned int>::max()) {
           lastPoint_ = points - 1;
         }
+
+        RandStartPt randStartPt(
+            nll,
+            specifiedVars_,
+            specifiedVals_,
+            skipDefaultStart_,
+            setParameterRandomInitialValueRanges_,
+            pointsRandProf_,
+            verbose,
+            fastScan_,
+            hasMaxDeltaNLLForProf_,
+            maxDeltaNLLForProf_,
+            specifiedNuis_,
+            specifiedFuncNames_,
+            specifiedFunc_,
+            specifiedFuncVals_,
+            specifiedCatNames_,
+            specifiedCat_,
+            specifiedCatVals_,
+            nOtherFloatingPoi_
+        );
 
         for (unsigned int i = 0; i < points; ++i) {
           if (i < firstPoint_) continue;
@@ -707,25 +728,6 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
             ////////////////// Rand starting points for each profiled POI to get best nll ////////////////////////////////////////////////////////////////////////////
             /////////////////  The default behavior (i.e. no random start point) is incorporated within the function below ////////////////////////////////////////////
             ///////////////// To retrieve only default start point usage, set _ to 0 or leave it unspecified. /////////////////////////////////////////
-            RandStartPt randStartPt(
-		    nll,
-		    specifiedVars_,
-		    specifiedVals_,
-		    skipDefaultStart_,
-		    setParameterRandomInitialValueRanges_,
-		    pointsRandProf_,
-		    verbose,
-		    fastScan_,
-		    hasMaxDeltaNLLForProf_,
-		    maxDeltaNLLForProf_,
-		    specifiedNuis_,
-		    specifiedFuncNames_,
-		    specifiedFunc_,
-		    specifiedFuncVals_,
-		    specifiedCatNames_,
-		    specifiedCat_,
-		    specifiedCatVals_,
-		    nOtherFloatingPoi_);
             randStartPt.doRandomStartPt1DGridScan(x, n, poiVals_, poiVars_, params, snap, deltaNLL_, nll0, minim, status_);
 
         } // End of the loop over scan points
@@ -739,7 +741,7 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
             std::cout<<"\n************************************************************************************"<<std::endl;
             std::cout<<"* Random starting point set to non-zero value. This will take some time to complete. *"<<std::endl;
             std::cout<<"************************************************************************************\n"<<std::endl;
-	    CombineLogger::instance().log("MultiDimFit.cc",__LINE__,"Random starting point set to non-zero value. This will take some time to complete.",__func__);
+            CombineLogger::instance().log("MultiDimFit.cc",__LINE__,"Random starting point set to non-zero value. This will take some time to complete.",__func__);
             srand(randPointsSeed_);
         }
         //else {
@@ -785,6 +787,27 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
         }
         unsigned int ipoint = 0, nprint = ceil(0.005 * nTotal);
 
+        RandStartPt randStartPt(
+            nll,
+            specifiedVars_,
+            specifiedVals_,
+            skipDefaultStart_,
+            setParameterRandomInitialValueRanges_,
+            pointsRandProf_,
+            verbose,
+            fastScan_,
+            hasMaxDeltaNLLForProf_,
+            maxDeltaNLLForProf_,
+            specifiedNuis_,
+            specifiedFuncNames_,
+            specifiedFunc_,
+            specifiedFuncVals_,
+            specifiedCatNames_,
+            specifiedCat_,
+            specifiedCatVals_,
+            nOtherFloatingPoi_
+        );
+
         // loop through the grid
         for (unsigned int i = 0; i < nX; ++i) {
             for (unsigned int j = 0; j < nY; ++j, ++ipoint) {
@@ -810,25 +833,6 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
                 //////////////////  The default behavior (i.e. no random start pt) is incorporated within the function below ////////////////////////////////////////////
                 ///////////////// To retrieve only default start point usage, set pointsRandProf_ to 0 or leave it unspecified. /////////////////////////////////
 
-                RandStartPt randStartPt(
-			nll,
-			specifiedVars_,
-			specifiedVals_,
-			skipDefaultStart_,
-			setParameterRandomInitialValueRanges_,
-			pointsRandProf_,
-			verbose,
-			fastScan_,
-			hasMaxDeltaNLLForProf_,
-			maxDeltaNLLForProf_,
-			specifiedNuis_,
-			specifiedFuncNames_,
-			specifiedFunc_,
-			specifiedFuncVals_,
-			specifiedCatNames_,
-			specifiedCat_,
-			specifiedCatVals_,
-			nOtherFloatingPoi_);
                 randStartPt.doRandomStartPt2DGridScan(x, y, n, poiVals_, poiVars_, params, snap, deltaNLL_, nll0, gridType_, deltaX, deltaY, minim, status_);
             } //End of loop over y scan points
         } //End of loop over x scan points

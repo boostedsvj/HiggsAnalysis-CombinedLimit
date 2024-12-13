@@ -4,6 +4,7 @@
 #include "HiggsAnalysis/CombinedLimit/interface/CascadeMinimizer.h"
 #include "HiggsAnalysis/CombinedLimit/interface/MultiDimFit.h"
 
+#include <map>
 #include <vector>
 #include <string>
 #include "RooRealVar.h"
@@ -31,6 +32,7 @@ class RandStartPt {
       std::vector<RooCategory*> &specifiedcat_; 
       std::vector<int> &specifiedcatvals_;
       unsigned int nOtherFloatingPOI_;
+      std::map<std::string, std::vector<float>> rand_ranges_dict_;
   public:
       RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedvars, std::vector<float> &specifiedvals, bool skipdefaultstart, std::string parameterRandInitialValranges, int numrandpts, int verbose, bool fastscan, bool hasmaxdeltaNLLforprof, float maxdeltaNLLforprof, std::vector<std::string> &specifiednuis, std::vector<std::string> &specifiedfuncnames, std::vector<RooAbsReal*> &specifiedfunc, std::vector<float> &specifiedfuncvals, std::vector<std::string> &specifiedcatnames, std::vector<RooCategory*> &specifiedcat, std::vector<int> &specifiedcatvals, unsigned int nOtherFloatingPOI);
       std::map<std::string, std::vector<float>> getRangesDictFromInString(std::string params_ranges_string_in);
