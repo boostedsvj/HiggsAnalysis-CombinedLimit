@@ -49,12 +49,29 @@ std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (){
     std::vector<std::vector<float>> wc_vals_vec_of_vec = {};
     int n_prof_params = specifiedvars_.size();
 
+    int n_default_starts = 0;
     if(!skipdefaultstart_) {
         std::vector<float> default_start_pt_vec;
         for (int prof_param_idx = 0; prof_param_idx<n_prof_params; prof_param_idx++){
             default_start_pt_vec.push_back(specifiedvars_[prof_param_idx]->getVal());
         }
         wc_vals_vec_of_vec.push_back(default_start_pt_vec);
+        ++n_default_starts;
+        // another default starting point from prev values (only if prev value usage requested for any param)
+        if (!parameterRandInitialValranges_.empty()) {
+            bool modified = false;
+            for (int prof_param_idx = 0; prof_param_idx<n_prof_params; prof_param_idx++){
+                const auto& poi_name = specifiedvars_[prof_param_idx]->GetName();
+                if (prev_dict_.find(poi_name) != prev_dict_.end()){
+                    default_start_pt_vec[prof_param_idx] = prev_dict_[poi_name][0];
+                    modified = true;
+                }
+            }
+            if (modified) {
+                wc_vals_vec_of_vec.push_back(default_start_pt_vec);
+                ++n_default_starts;
+            }
+        }
     }
 
     // Append the random points to the vector of points to try
@@ -89,6 +106,15 @@ std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (){
             float rand_num = no_rand ? prof_start_pt_range_max : (rand()*2.0*prof_start_pt_range_max)/RAND_MAX - prof_start_pt_range_max;
             wc_vals_vec.push_back(rand_num);
         }
+        // avoid redundancy w/ default starting points above
+        bool novel = true;
+        for (int npt = 0; npt < n_default_starts; ++npt) {
+            if (wc_vals_vec==wc_vals_vec_of_vec[npt]) {
+                novel = false;
+                break;
+            }
+        }
+        if (!novel) continue;
         wc_vals_vec_of_vec.push_back(wc_vals_vec);
     }
 
