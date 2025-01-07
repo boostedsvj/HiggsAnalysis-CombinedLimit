@@ -66,6 +66,9 @@ std::string MultiDimFit::robustHesseSave_ = "";
 int MultiDimFit::pointsRandProf_ = 0;
 int MultiDimFit::randPointsSeed_ = 0;
 std::string MultiDimFit::setParameterRandomInitialValueRanges_;
+int MultiDimFit::debugRandIteration_ = -1;
+int MultiDimFit::debugRandPoints_ = 0;
+std::string MultiDimFit::debugParameterRandomInitialValueRanges_;
 
 
 std::string MultiDimFit::saveSpecifiedFuncs_;
@@ -121,6 +124,9 @@ MultiDimFit::MultiDimFit() :
         ("pointsRandProf",  boost::program_options::value<int>(&pointsRandProf_)->default_value(pointsRandProf_),  "Number of random start points to try for the profiled POIs")
         ("randPointsSeed",  boost::program_options::value<int>(&randPointsSeed_)->default_value(randPointsSeed_),  "Seed to use when generating random start points to try for the profiled POIs")
         ("setParameterRandomInitialValueRanges",  boost::program_options::value<std::string>(&setParameterRandomInitialValueRanges_)->default_value(""),  "Range from which to draw random start points for the profiled POIs. This range should be equal to or smaller than the max and min values for the profiled POIs. Does not override max/min ranges for the given POIs. E.g. usage: c1=-5,5:c2=-1,1")
+        ("debugRandIteration",  boost::program_options::value<int>(&debugRandIteration_)->default_value(debugRandIteration_),  "Debug fit with random start points for a specific grid iteration (save all likelihood values)")
+        ("debugRandPoints",  boost::program_options::value<int>(&debugRandPoints_)->default_value(debugRandPoints_),  "Number of points for debugging fit with random start points")
+        ("debugParameterRandomInitialValueRanges",  boost::program_options::value<std::string>(&debugParameterRandomInitialValueRanges_)->default_value(""),  "Alternate set of ranges for debugging fit with random start points")
         ;
 }
 
@@ -728,6 +734,8 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
             ////////////////// Rand starting points for each profiled POI to get best nll ////////////////////////////////////////////////////////////////////////////
             /////////////////  The default behavior (i.e. no random start point) is incorporated within the function below ////////////////////////////////////////////
             ///////////////// To retrieve only default start point usage, set _ to 0 or leave it unspecified. /////////////////////////////////////////
+            if (debugRandPoints_>0 and debugRandIteration_==int(i)) randStartPt.setDebug(debugRandPoints_, debugParameterRandomInitialValueRanges_);
+
             randStartPt.doRandomStartPt1DGridScan(x, n, poiVals_, poiVars_, params, snap, deltaNLL_, nll0, minim, status_);
 
         } // End of the loop over scan points
@@ -832,6 +840,7 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
                 ///////////////////////////////// Rand starting points for each profiled POI to get best nll /////////////////////////////////////////////////////////////////////////
                 //////////////////  The default behavior (i.e. no random start pt) is incorporated within the function below ////////////////////////////////////////////
                 ///////////////// To retrieve only default start point usage, set pointsRandProf_ to 0 or leave it unspecified. /////////////////////////////////
+                if (debugRandPoints_>0 and debugRandIteration_==int(i*nY+j)) randStartPt.setDebug(debugRandPoints_, debugParameterRandomInitialValueRanges_);
 
                 randStartPt.doRandomStartPt2DGridScan(x, y, n, poiVals_, poiVars_, params, snap, deltaNLL_, nll0, gridType_, deltaX, deltaY, minim, status_);
             } //End of loop over y scan points

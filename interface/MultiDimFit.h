@@ -74,6 +74,10 @@ protected:
   static std::string setParameterRandomInitialValueRanges_;
   static int randPointsSeed_;
 
+  static int debugRandIteration_;
+  static int debugRandPoints_;
+  static std::string debugParameterRandomInitialValueRanges_;
+
   static std::string saveSpecifiedFuncs_;
   static std::string saveSpecifiedNuis_;
   static std::string saveSpecifiedIndex_;
