@@ -20,10 +20,11 @@
 #include <Math/QuantFuncMathCore.h>
 #include <Math/ProbFunc.h>
 
-RandStartPt::RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedvars, std::vector<float> &specifiedvals, bool skipdefaultstart, const std::string& parameterRandInitialValranges, int numrandpts, int verbose, bool fastscan, bool hasmaxdeltaNLLforprof, float maxdeltaNLLforprof, std::vector<std::string> &specifiednuis, std::vector<std::string> &specifiedfuncnames, std::vector<RooAbsReal*> &specifiedfunc, std::vector<float> &specifiedfuncvals, std::vector<std::string> &specifiedcatnames, std::vector<RooCategory*> &specifiedcat, std::vector<int> &specifiedcatvals, unsigned int nOtherFloatingPOI) :
+RandStartPt::RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedvars, std::vector<float> &specifiedvals, std::vector<float> &specifiederrs, bool skipdefaultstart, const std::string& parameterRandInitialValranges, int numrandpts, int verbose, bool fastscan, bool hasmaxdeltaNLLforprof, float maxdeltaNLLforprof, std::vector<std::string> &specifiednuis, std::vector<std::string> &specifiedfuncnames, std::vector<RooAbsReal*> &specifiedfunc, std::vector<float> &specifiedfuncvals, std::vector<std::string> &specifiedcatnames, std::vector<RooCategory*> &specifiedcat, std::vector<int> &specifiedcatvals, unsigned int nOtherFloatingPOI) :
     nll_(nll),
     specifiedvars_(specifiedvars),
     specifiedvals_(specifiedvals),
+    specifiederrs_(specifiederrs),
     skipdefaultstart_(skipdefaultstart), 
     parameterRandInitialValranges_(parameterRandInitialValranges), 
     numrandpts_(numrandpts), 
@@ -207,6 +208,7 @@ void RandStartPt::setProfPOIvalues(unsigned int startptIdx, std::vector<std::vec
 void RandStartPt::setValSpecifiedObjs(){
     for(unsigned int j=0; j<specifiednuis_.size(); j++){
         specifiedvals_[j]=specifiedvars_[j]->getVal();
+        if (!specifiederrs_.empty()) specifiederrs_[j]=specifiedvars_[j]->getError();
     }
     for(unsigned int j=0; j<specifiedfuncnames_.size(); j++){
         specifiedfuncvals_[j]=specifiedfunc_[j]->getVal();

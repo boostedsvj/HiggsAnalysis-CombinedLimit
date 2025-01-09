@@ -1,5 +1,6 @@
 #include "../interface/MultiDimFit.h"
 #include <stdexcept>
+#include <sstream>
 #include <cmath>
 
 #include "TMath.h"
@@ -74,6 +75,7 @@ std::string MultiDimFit::debugParameterRandomInitialValueRanges_;
 std::string MultiDimFit::saveSpecifiedFuncs_;
 std::string MultiDimFit::saveSpecifiedIndex_;
 std::string MultiDimFit::saveSpecifiedNuis_;
+bool MultiDimFit::saveSpecifiedNuisErrors_ = false;
 std::string MultiDimFit::setParametersForGrid_;
 std::vector<std::string>  MultiDimFit::specifiedFuncNames_;
 std::vector<RooAbsReal*> MultiDimFit::specifiedFunc_;
@@ -86,6 +88,7 @@ RooArgList                MultiDimFit::specifiedCatList_;
 std::vector<std::string>  MultiDimFit::specifiedNuis_;
 std::vector<RooRealVar *> MultiDimFit::specifiedVars_;
 std::vector<float>        MultiDimFit::specifiedVals_;
+std::vector<float>        MultiDimFit::specifiedErrs_;
 RooArgList                MultiDimFit::specifiedList_;
 bool MultiDimFit::saveInactivePOI_= false;
 bool MultiDimFit::skipDefaultStart_ = false;
@@ -109,6 +112,7 @@ MultiDimFit::MultiDimFit() :
         ("fastScan", "Do a fast scan, evaluating the likelihood without profiling it.")
         ("maxDeltaNLLForProf",  boost::program_options::value<float>(&maxDeltaNLLForProf_)->default_value(maxDeltaNLLForProf_), "Last point to use")
 	("saveSpecifiedNuis",   boost::program_options::value<std::string>(&saveSpecifiedNuis_)->default_value(""), "Save specified parameters (default = none)")
+	("saveSpecifiedNuisErrors",   boost::program_options::value<bool>(&saveSpecifiedNuisErrors_)->default_value(saveSpecifiedNuisErrors_), "Save errors on specified parameters")
 	("saveSpecifiedFunc",   boost::program_options::value<std::string>(&saveSpecifiedFuncs_)->default_value(""), "Save specified function values (default = none)")
 	("saveSpecifiedIndex",   boost::program_options::value<std::string>(&saveSpecifiedIndex_)->default_value(""), "Save specified indexes/discretes (default = none)")
 	("saveInactivePOI",   boost::program_options::value<bool>(&saveInactivePOI_)->default_value(saveInactivePOI_), "Save inactive POIs in output (1) or not (0, default)")
@@ -246,6 +250,7 @@ bool MultiDimFit::runSpecific(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooS
         //if (algo_ != None) {
 	for(unsigned int j=0; j<specifiedNuis_.size(); j++){
 		specifiedVals_[j]=specifiedVars_[j]->getVal();
+        if (saveSpecifiedNuisErrors_) specifiedErrs_[j]=specifiedVars_[j]->getError();
 	}
 	for(unsigned int j=0; j<specifiedFuncNames_.size(); j++){
 		specifiedFuncVals_[j]=specifiedFunc_[j]->getVal();
@@ -360,11 +365,10 @@ void MultiDimFit::initOnce(RooWorkspace *w, RooStats::ModelConfig *mc_s) {
     }
 
     if(saveSpecifiedFuncs_!=""){
-	    char tmp[10240] ;
-	    strlcpy(tmp,saveSpecifiedFuncs_.c_str(),10240) ;
-	    char* token = strtok(tmp,",") ;
-	    while(token) {
-		    RooAbsArg *a = w->arg(token);
+        std::stringstream ss(saveSpecifiedFuncs_);
+        std::string token;
+	    while(std::getline(ss,token,',')) {
+		    RooAbsArg *a = w->arg(token.c_str());
 		    if (a == 0) throw std::invalid_argument(std::string("function ")+token+" not in model.");
 		    RooAbsReal *rrv = dynamic_cast<RooAbsReal*>(a);
 		    if (rrv == 0) throw std::invalid_argument(std::string("function ")+token+" not a RooAbsReal.");
@@ -372,21 +376,18 @@ void MultiDimFit::initOnce(RooWorkspace *w, RooStats::ModelConfig *mc_s) {
 		    specifiedFunc_.push_back(rrv);
 		    specifiedFuncVals_.push_back(rrv->getVal());
 		    specifiedFuncList_.add(*rrv);
-		    token = strtok(0,",") ; 
 	    }
     }
     if(saveSpecifiedIndex_!=""){
-	    char tmp[10240] ;
-	    strlcpy(tmp,saveSpecifiedIndex_.c_str(),10240) ;
-	    char* token = strtok(tmp,",") ;
-	    while(token) {
-		    RooCategory *rrv = w->cat(token);
+        std::stringstream ss(saveSpecifiedIndex_);
+        std::string token;
+	    while(std::getline(ss,token,',')) {
+		    RooCategory *rrv = w->cat(token.c_str());
 		    if (rrv == 0) throw std::invalid_argument(std::string("function ")+token+" not a RooCategory.");
 		    specifiedCatNames_.push_back(token);
 		    specifiedCat_.push_back(rrv);
 		    specifiedCatVals_.push_back(rrv->getIndex());
 		    specifiedCatList_.add(*rrv);
-		    token = strtok(0,",") ; 
 	    }
     }
 
@@ -399,19 +400,17 @@ void MultiDimFit::initOnce(RooWorkspace *w, RooStats::ModelConfig *mc_s) {
 			    specifiedNuis_.push_back(a->GetName());
 		    }
 	    }else{
-		    char tmp[10240] ;
-		    strlcpy(tmp,saveSpecifiedNuis_.c_str(),10240) ;
-		    char* token = strtok(tmp,",") ;
-		    while(token) {
+            std::stringstream ss(saveSpecifiedNuis_);
+            std::string token;
+		    while(std::getline(ss,token,',')) {
 			    const RooArgSet* group = mc_s->GetWS()->set((std::string("group_") + token).data());
 			    if (group){
                     for (RooAbsArg *a : *group) {
 					    specifiedNuis_.push_back(a->GetName());
 				    }
-			    }else if (!poiList_.find(token)){
+			    }else if (!poiList_.find(token.c_str())){
 				    specifiedNuis_.push_back(token);
 			    }
-			    token = strtok(0,",") ; 
 		    }
 	    }
 	    for (std::vector<std::string>::const_iterator it = specifiedNuis_.begin(), ed = specifiedNuis_.end(); it != ed; ++it) {
@@ -422,6 +421,7 @@ void MultiDimFit::initOnce(RooWorkspace *w, RooStats::ModelConfig *mc_s) {
 		    if (rrv == 0) throw std::invalid_argument(std::string("Nuisance parameter ")+*it+" not a RooRealVar.");
 		    specifiedVars_.push_back(rrv);
 		    specifiedVals_.push_back(rrv->getVal());
+            if (saveSpecifiedNuisErrors_) specifiedErrs_.push_back(rrv->getError());
 		    specifiedList_.add(*rrv);
 	    }
     }
@@ -433,6 +433,7 @@ void MultiDimFit::initOnce(RooWorkspace *w, RooStats::ModelConfig *mc_s) {
 		    specifiedNuis_.push_back(a->GetName());
 		    specifiedVars_.push_back(rrv);
 		    specifiedVals_.push_back(rrv->getVal());
+            if (saveSpecifiedNuisErrors_) specifiedErrs_.push_back(rrv->getError());
 		    specifiedList_.add(*rrv);
 	    }
     }
@@ -443,6 +444,7 @@ void MultiDimFit::initOnce(RooWorkspace *w, RooStats::ModelConfig *mc_s) {
     }
     for (int i = 0, n = specifiedNuis_.size(); i < n; ++i) {
 	Combine::addBranch(specifiedNuis_[i].c_str(), &specifiedVals_[i], (specifiedNuis_[i]+"/F").c_str()); 
+    if (saveSpecifiedNuisErrors_) Combine::addBranch(("error_"+specifiedNuis_[i]).c_str(), &specifiedErrs_[i], ("error_"+specifiedNuis_[i]+"/F").c_str());
     }
     for (int i = 0, n = specifiedFuncNames_.size(); i < n; ++i) {
 	Combine::addBranch(specifiedFuncNames_[i].c_str(), &specifiedFuncVals_[i], (specifiedFuncNames_[i]+"/F").c_str()); 
@@ -574,6 +576,7 @@ void MultiDimFit::doImpact(RooFitResult &res, RooAbsReal &nll) {
         }
         for (unsigned int j = 0; j < specifiedNuis_.size(); j++) {
           specifiedVals_[j] = specifiedVars_[j]->getVal();
+          if (saveSpecifiedNuisErrors_) specifiedErrs_[j] = specifiedVars_[j]->getError();
         }
         for (unsigned int j = 0; j < specifiedFuncNames_.size(); j++) {
           specifiedFuncVals_[j] = specifiedFunc_[j]->getVal();
@@ -681,6 +684,7 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
             nll,
             specifiedVars_,
             specifiedVals_,
+            specifiedErrs_,
             skipDefaultStart_,
             setParameterRandomInitialValueRanges_,
             pointsRandProf_,
@@ -799,6 +803,7 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
             nll,
             specifiedVars_,
             specifiedVals_,
+            specifiedErrs_,
             skipDefaultStart_,
             setParameterRandomInitialValueRanges_,
             pointsRandProf_,
@@ -905,6 +910,7 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
             if (nll.numEvalErrors() > 0) {
                 for (unsigned int j=0; j<specifiedNuis_.size(); j++) {
                     specifiedVals_[j]=specifiedVars_[j]->getVal();
+                    if (saveSpecifiedNuisErrors_) specifiedErrs_[j] = specifiedVars_[j]->getError();
                 }
                 for (unsigned int j=0; j<specifiedFuncNames_.size(); j++) {
                     specifiedFuncVals_[j]=specifiedFunc_[j]->getVal();
@@ -926,6 +932,7 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
                 double prob = ROOT::Math::chisquared_cdf_c(qN, n+nOtherFloatingPoi_);
                 for (unsigned int j=0; j<specifiedNuis_.size(); j++) {
                     specifiedVals_[j]=specifiedVars_[j]->getVal();
+                    if (saveSpecifiedNuisErrors_) specifiedErrs_[j] = specifiedVars_[j]->getError();
                 }
                 for (unsigned int j=0; j<specifiedFuncNames_.size(); j++) {
                     specifiedFuncVals_[j]=specifiedFunc_[j]->getVal();
@@ -967,6 +974,7 @@ void MultiDimFit::doRandomPoints(RooWorkspace *w, RooAbsReal &nll)
                 double prob = ROOT::Math::chisquared_cdf_c(qN, n+nOtherFloatingPoi_);
 		for(unsigned int j=0; j<specifiedNuis_.size(); j++){
 			specifiedVals_[j]=specifiedVars_[j]->getVal();
+			if (saveSpecifiedNuisErrors_) specifiedErrs_[j] = specifiedVars_[j]->getError();
 		}
 		for(unsigned int j=0; j<specifiedFuncNames_.size(); j++){
 			specifiedFuncVals_[j]=specifiedFunc_[j]->getVal();
@@ -1020,6 +1028,7 @@ void MultiDimFit::doFixedPoint(RooWorkspace *w, RooAbsReal &nll)
 		    double prob = ROOT::Math::chisquared_cdf_c(qN, n+nOtherFloatingPoi_);
 		    for(unsigned int j=0; j<specifiedNuis_.size(); j++){
 			    specifiedVals_[j]=specifiedVars_[j]->getVal();
+			    if (saveSpecifiedNuisErrors_) specifiedErrs_[j] = specifiedVars_[j]->getError();
 		    }
 		    for(unsigned int j=0; j<specifiedFuncNames_.size(); j++){
 			    specifiedFuncVals_[j]=specifiedFunc_[j]->getVal();

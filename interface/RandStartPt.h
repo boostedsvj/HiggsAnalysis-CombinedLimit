@@ -17,6 +17,7 @@ class RandStartPt {
       RooAbsReal& nll_;
       std::vector<RooRealVar* > &specifiedvars_;
       std::vector<float> &specifiedvals_;
+      std::vector<float> &specifiederrs_;
       bool skipdefaultstart_;
       std::string parameterRandInitialValranges_;
       int numrandpts_;
@@ -39,7 +40,7 @@ class RandStartPt {
       std::map<std::string, std::vector<float>> debug_ranges_dict_;
       std::map<std::string, std::vector<float>> debug_prev_dict_;
   public:
-      RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedvars, std::vector<float> &specifiedvals, bool skipdefaultstart, const std::string& parameterRandInitialValranges, int numrandpts, int verbose, bool fastscan, bool hasmaxdeltaNLLforprof, float maxdeltaNLLforprof, std::vector<std::string> &specifiednuis, std::vector<std::string> &specifiedfuncnames, std::vector<RooAbsReal*> &specifiedfunc, std::vector<float> &specifiedfuncvals, std::vector<std::string> &specifiedcatnames, std::vector<RooCategory*> &specifiedcat, std::vector<int> &specifiedcatvals, unsigned int nOtherFloatingPOI);
+      RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedvars, std::vector<float> &specifiedvals, std::vector<float> &specifiederrs, bool skipdefaultstart, const std::string& parameterRandInitialValranges, int numrandpts, int verbose, bool fastscan, bool hasmaxdeltaNLLforprof, float maxdeltaNLLforprof, std::vector<std::string> &specifiednuis, std::vector<std::string> &specifiedfuncnames, std::vector<RooAbsReal*> &specifiedfunc, std::vector<float> &specifiedfuncvals, std::vector<std::string> &specifiedcatnames, std::vector<RooCategory*> &specifiedcat, std::vector<int> &specifiedcatvals, unsigned int nOtherFloatingPOI);
       void getRangesDictFromInString(const std::string& params_ranges_string_in, std::map<std::string, std::vector<float>>& ranges_dict, std::map<std::string, std::vector<float>>& prev_dict);
       std::vector<std::vector<float>> vectorOfPointsToTry (int num, std::map<std::string, std::vector<float>>& ranges_dict, std::map<std::string, std::vector<float>>& prev_dict);
       void commitBestNLLVal(unsigned int idx, float &nllVal, double &probVal);

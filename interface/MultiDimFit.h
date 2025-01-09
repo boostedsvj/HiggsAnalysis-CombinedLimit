@@ -81,6 +81,7 @@ protected:
   static std::string saveSpecifiedFuncs_;
   static std::string saveSpecifiedNuis_;
   static std::string saveSpecifiedIndex_;
+  static bool saveSpecifiedNuisErrors_;
   static std::vector<std::string>  specifiedFuncNames_;
   static std::vector<RooAbsReal*> specifiedFunc_;
   static std::vector<float>        specifiedFuncVals_;
@@ -92,6 +93,7 @@ protected:
   static std::vector<std::string>  specifiedNuis_;
   static std::vector<RooRealVar *> specifiedVars_;
   static std::vector<float>        specifiedVals_;
+  static std::vector<float>        specifiedErrs_;
   static RooArgList                specifiedList_;
   static bool saveInactivePOI_;
   static bool skipDefaultStart_;
