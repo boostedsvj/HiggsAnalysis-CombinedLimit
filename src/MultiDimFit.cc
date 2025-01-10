@@ -67,6 +67,7 @@ std::string MultiDimFit::robustHesseSave_ = "";
 int MultiDimFit::pointsRandProf_ = 0;
 int MultiDimFit::randPointsSeed_ = 0;
 std::string MultiDimFit::setParameterRandomInitialValueRanges_;
+std::string MultiDimFit::extPointsFile_;
 int MultiDimFit::debugRandIteration_ = -1;
 int MultiDimFit::debugRandPoints_ = 0;
 std::string MultiDimFit::debugParameterRandomInitialValueRanges_;
@@ -112,7 +113,7 @@ MultiDimFit::MultiDimFit() :
         ("fastScan", "Do a fast scan, evaluating the likelihood without profiling it.")
         ("maxDeltaNLLForProf",  boost::program_options::value<float>(&maxDeltaNLLForProf_)->default_value(maxDeltaNLLForProf_), "Last point to use")
 	("saveSpecifiedNuis",   boost::program_options::value<std::string>(&saveSpecifiedNuis_)->default_value(""), "Save specified parameters (default = none)")
-	("saveSpecifiedNuisErrors",   boost::program_options::value<bool>(&saveSpecifiedNuisErrors_)->default_value(saveSpecifiedNuisErrors_), "Save errors on specified parameters")
+	("saveSpecifiedNuisErrors", "Save errors on specified parameters")
 	("saveSpecifiedFunc",   boost::program_options::value<std::string>(&saveSpecifiedFuncs_)->default_value(""), "Save specified function values (default = none)")
 	("saveSpecifiedIndex",   boost::program_options::value<std::string>(&saveSpecifiedIndex_)->default_value(""), "Save specified indexes/discretes (default = none)")
 	("saveInactivePOI",   boost::program_options::value<bool>(&saveInactivePOI_)->default_value(saveInactivePOI_), "Save inactive POIs in output (1) or not (0, default)")
@@ -128,6 +129,7 @@ MultiDimFit::MultiDimFit() :
         ("pointsRandProf",  boost::program_options::value<int>(&pointsRandProf_)->default_value(pointsRandProf_),  "Number of random start points to try for the profiled POIs")
         ("randPointsSeed",  boost::program_options::value<int>(&randPointsSeed_)->default_value(randPointsSeed_),  "Seed to use when generating random start points to try for the profiled POIs")
         ("setParameterRandomInitialValueRanges",  boost::program_options::value<std::string>(&setParameterRandomInitialValueRanges_)->default_value(""),  "Range from which to draw random start points for the profiled POIs. This range should be equal to or smaller than the max and min values for the profiled POIs. Does not override max/min ranges for the given POIs. E.g. usage: c1=-5,5:c2=-1,1")
+        ("extPointsFile",  boost::program_options::value<std::string>(&extPointsFile_)->default_value(""),  "Get initial parameter values for (random) fits from this file")
         ("debugRandIteration",  boost::program_options::value<int>(&debugRandIteration_)->default_value(debugRandIteration_),  "Debug fit with random start points for a specific grid iteration (save all likelihood values)")
         ("debugRandPoints",  boost::program_options::value<int>(&debugRandPoints_)->default_value(debugRandPoints_),  "Number of points for debugging fit with random start points")
         ("debugParameterRandomInitialValueRanges",  boost::program_options::value<std::string>(&debugParameterRandomInitialValueRanges_)->default_value(""),  "Alternate set of ranges for debugging fit with random start points")
@@ -168,6 +170,7 @@ void MultiDimFit::applyOptions(const boost::program_options::variables_map &vm)
     fastScan_ = (vm.count("fastScan") > 0);
     squareDistPoiStep_ = (vm.count("squareDistPoiStep") > 0);
     skipInitialFit_ = (vm.count("skipInitialFit") > 0);
+    saveSpecifiedNuisErrors_ = (vm.count("saveSpecifiedNuisErrors") > 0);
     hasMaxDeltaNLLForProf_ = !vm["maxDeltaNLLForProf"].defaulted();
     loadedSnapshot_ = !vm["snapshotName"].defaulted();
     savingSnapshot_ = vm.count("saveWorkspace");
@@ -699,7 +702,8 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
             specifiedCatNames_,
             specifiedCat_,
             specifiedCatVals_,
-            nOtherFloatingPoi_
+            nOtherFloatingPoi_,
+            extPointsFile_
         );
 
         for (unsigned int i = 0; i < points; ++i) {
@@ -818,7 +822,8 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
             specifiedCatNames_,
             specifiedCat_,
             specifiedCatVals_,
-            nOtherFloatingPoi_
+            nOtherFloatingPoi_,
+            extPointsFile_
         );
 
         // loop through the grid

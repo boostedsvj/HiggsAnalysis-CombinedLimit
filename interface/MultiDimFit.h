@@ -73,6 +73,7 @@ protected:
   static int pointsRandProf_;
   static std::string setParameterRandomInitialValueRanges_;
   static int randPointsSeed_;
+  static std::string extPointsFile_;
 
   static int debugRandIteration_;
   static int debugRandPoints_;

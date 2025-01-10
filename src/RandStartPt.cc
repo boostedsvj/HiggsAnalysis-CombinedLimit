@@ -6,6 +6,7 @@
 #include <vector>
 #include <iostream>
 #include <cmath>
+#include <algorithm>
 
 #include "TMath.h"
 #include "TFile.h"
@@ -20,7 +21,7 @@
 #include <Math/QuantFuncMathCore.h>
 #include <Math/ProbFunc.h>
 
-RandStartPt::RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedvars, std::vector<float> &specifiedvals, std::vector<float> &specifiederrs, bool skipdefaultstart, const std::string& parameterRandInitialValranges, int numrandpts, int verbose, bool fastscan, bool hasmaxdeltaNLLforprof, float maxdeltaNLLforprof, std::vector<std::string> &specifiednuis, std::vector<std::string> &specifiedfuncnames, std::vector<RooAbsReal*> &specifiedfunc, std::vector<float> &specifiedfuncvals, std::vector<std::string> &specifiedcatnames, std::vector<RooCategory*> &specifiedcat, std::vector<int> &specifiedcatvals, unsigned int nOtherFloatingPOI) :
+RandStartPt::RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedvars, std::vector<float> &specifiedvals, std::vector<float> &specifiederrs, bool skipdefaultstart, const std::string& parameterRandInitialValranges, int numrandpts, int verbose, bool fastscan, bool hasmaxdeltaNLLforprof, float maxdeltaNLLforprof, std::vector<std::string> &specifiednuis, std::vector<std::string> &specifiedfuncnames, std::vector<RooAbsReal*> &specifiedfunc, std::vector<float> &specifiedfuncvals, std::vector<std::string> &specifiedcatnames, std::vector<RooCategory*> &specifiedcat, std::vector<int> &specifiedcatvals, unsigned int nOtherFloatingPOI, const std::string& extfilename) :
     nll_(nll),
     specifiedvars_(specifiedvars),
     specifiedvals_(specifiedvals),
@@ -41,16 +42,80 @@ RandStartPt::RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedva
     specifiedcatvals_(specifiedcatvals),
     nOtherFloatingPOI_(nOtherFloatingPOI),
     debug_(false),
-    numdebugpts_(0)
+    numdebugpts_(0),
+    extfilename_(extfilename),
+    extfile_(nullptr),
+    exttree_(nullptr)
     {
+        //set up reading initial values from external file
+        //external file should also have been generated using MultiDimFit with args --saveSpecifiedNuis and --saveSpecifiedNuisErrors
+        if (!extfilename_.empty()) {
+            extfile_ = TFile::Open(extfilename_.c_str());
+            exttree_ = (TTree*)extfile_->Get("limit");
+            //copy nuisance vectors to use as branches
+            extvals_ = specifiedvals_;
+            exterrs_ = specifiederrs_;
+            for (unsigned i = 0; i < specifiedvars_.size(); ++i){
+                exttree_->SetBranchAddress(specifiedvars_[i]->GetName(), &extvals_[i]);
+                exttree_->SetBranchAddress((std::string("error_")+specifiedvars_[i]->GetName()).c_str(), &exterrs_[i]);
+            }
+        }
+
         if (!parameterRandInitialValranges_.empty()) {
-            RandStartPt::getRangesDictFromInString(parameterRandInitialValranges_, rand_ranges_dict_, prev_dict_);
+            RandStartPt::getRangesDictFromInString(parameterRandInitialValranges_, rand_ranges_dict_, prev_dict_, ext_dict_);
         }
     }
 
-std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (int num, std::map<std::string, std::vector<float>>& ranges_dict, std::map<std::string, std::vector<float>>& prev_dict){
+//helper function to compute err-dependent ranges
+namespace {
+bool compute_range(std::map<std::string, std::vector<float>>& val_dict, const std::string& poi_name, float& prof_start_pt_range_max){
+    bool no_rand = false;
+    float val = val_dict[poi_name][0];
+    float err = val_dict[poi_name][1];
+    float fac = val_dict[poi_name][2];
+    float lo = err!=-1 ? val - fac*err : val - fac*val;
+    float hi = err!=-1 ? val + fac*err : val + fac*val;
+    prof_start_pt_range_max = std::max(lo, hi);
+    if (fac==0) no_rand = true;
+    return no_rand;
+}
+}
+
+std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (std::vector<RooRealVar* > &pois, int num, std::map<std::string, std::vector<float>>& ranges_dict, std::map<std::string, std::vector<float>>& prev_dict, std::map<std::string, std::vector<float>>& ext_dict){
     std::vector<std::vector<float>> wc_vals_vec_of_vec = {};
     int n_prof_params = specifiedvars_.size();
+
+    // get ext values from tree
+    if (!ext_dict.empty()) {
+        std::stringstream scut;
+        scut.precision(16);
+        for (unsigned p = 0; p < pois.size(); ++p){
+            scut << pois[p]->GetName() << "==" << pois[p]->getVal() << "&&";
+        }
+        std::string cut = scut.str();
+        cut.pop_back(); cut.pop_back();
+        // if ext file was also generated using pointsRandProf, it may have multiple likelihoods per iteration
+        // take the lowest likelihood
+        int nentries = exttree_->Draw("Entry$:deltaNLL", cut.c_str(), "goff");
+        double* a_entry = exttree_->GetV1();
+        double* a_dnll = exttree_->GetV2();
+        int argmin = std::distance(a_dnll, std::min_element(a_dnll, a_dnll+nentries));
+        int min_entry = a_entry[argmin];
+        // for debugging
+        if (verbosity_ > 1) {
+            std::cout << "Selecting ext value " << cut << " : entry " << min_entry << " w/ dnll " << a_dnll[argmin] << std::endl;
+        }
+        // load branch values for minimum likelihood for current poi values
+        exttree_->GetEntry(min_entry);
+        // populate dict
+        for (int prof_param_idx=0; prof_param_idx<n_prof_params; prof_param_idx++) {
+            const auto& poi_name = specifiedvars_[prof_param_idx]->GetName();
+            if (ext_dict.find(poi_name) != ext_dict.end()){
+                ext_dict[poi_name][0] = extvals_[prof_param_idx];
+                if (ext_dict[poi_name][1]!=-1) ext_dict[poi_name][1] = exterrs_[prof_param_idx];
+            }
+        }
+    }
 
     int n_default_starts = 0;
     if(!skipdefaultstart_) {
@@ -60,13 +125,17 @@ std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (int num, std::
         }
         wc_vals_vec_of_vec.push_back(default_start_pt_vec);
         ++n_default_starts;
-        // another default starting point from prev values (only if prev value usage requested for any param)
+        // another default starting point from prev or ext values (only if prev or ext value usage requested for any param)
         if (!parameterRandInitialValranges_.empty()) {
             bool modified = false;
             for (int prof_param_idx = 0; prof_param_idx<n_prof_params; prof_param_idx++){
                 const auto& poi_name = specifiedvars_[prof_param_idx]->GetName();
                 if (prev_dict.find(poi_name) != prev_dict.end()){
                     default_start_pt_vec[prof_param_idx] = prev_dict[poi_name][0];
+                    modified = true;
+                }
+                else if (ext_dict.find(poi_name) != ext_dict.end()){
+                    default_start_pt_vec[prof_param_idx] = ext_dict[poi_name][0];
                     modified = true;
                 }
             }
@@ -87,13 +156,10 @@ std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (int num, std::
             if (!parameterRandInitialValranges_.empty()) {
                 const auto& poi_name = specifiedvars_[prof_param_idx]->GetName();
                 if (prev_dict.find(poi_name) != prev_dict.end()){ //if the value from the previous grid step should be used as the initial value
-                    float prev_val = prev_dict[poi_name][0];
-                    float prev_err = prev_dict[poi_name][1];
-                    float prev_fac = prev_dict[poi_name][2];
-                    float prev_lo = prev_val - prev_fac*prev_err;
-                    float prev_hi = prev_val + prev_fac*prev_err;
-                    prof_start_pt_range_max = std::max(prev_lo, prev_hi);
-                    if (prev_fac==0) no_rand = true;
+                    no_rand = compute_range(prev_dict, poi_name, prof_start_pt_range_max);
+                }
+                else if (ext_dict.find(poi_name) != ext_dict.end()){ //if value from external file should be used as initial value
+                    no_rand = compute_range(ext_dict, poi_name, prof_start_pt_range_max);
                 }
                 else if (ranges_dict.find(poi_name) != ranges_dict.end()){   //if the random starting point range for this floating POI was supplied during runtime
                     float rand_range_lo = ranges_dict[poi_name][0];
@@ -136,13 +202,34 @@ std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (int num, std::
     return wc_vals_vec_of_vec;
 }
 
+//helper function to parse error-dependent ranges
+namespace {
+bool parse_range_factor(const std::string& params_ranges_string_2, float& factor){
+    factor = 0;
+    bool use_err = false;
+    if (params_ranges_string_2!="none") {
+        std::vector<std::string> err_range_string;
+        boost::split(err_range_string, params_ranges_string_2, boost::is_any_of("*"));
+        if (err_range_string.size()==1) {
+            if (err_range_string[0]=="err") { factor = 1; use_err = true; }
+            else factor = atof(err_range_string[0].c_str()); //range is relative to poi rather than err in this case
+        }
+        else if (err_range_string.size()==2) { factor = atof(err_range_string[0].c_str()); use_err = true; }
+        else std::cout << "Error parsing expression : " << params_ranges_string_2 << std::endl;
+    }
+    return use_err;
+}
+}
+
 // Extract the ranges map from the input string
 // Assumes the string is formatted with colons like "poi_name1=lo_lim,hi_lim:poi_name2=lo_lim,hi_lim"
-// Alternative form: poi_name1=prev,none:po1_name2=prev,2*err
+// Alternative form: poi_name1=prev,none:poi_name2=prev,2*err
 // where prev indicates the poi value from the previous step in the grid should be used (only makes sense in 1d)
 // and x*err indicates that the range should be some factor multiplied by the poi error from the previous step
 // if none, no random variation of this poi
-void RandStartPt::getRangesDictFromInString(const std::string& params_ranges_string_in, std::map<std::string, std::vector<float>>& ranges_dict, std::map<std::string, std::vector<float>>& prev_dict) {
+// Alternative form 2: poi_name1=ext,none:poi_name2=ext,2*err
+// where ext indicates that the poi value from specified external file should be used
+void RandStartPt::getRangesDictFromInString(const std::string& params_ranges_string_in, std::map<std::string, std::vector<float>>& ranges_dict, std::map<std::string, std::vector<float>>& prev_dict, std::map<std::string, std::vector<float>>& ext_dict) {
     std::vector<std::string> params_ranges_string_lst;
     boost::split(params_ranges_string_lst, params_ranges_string_in, boost::is_any_of(":"));
     for (UInt_t p = 0; p < params_ranges_string_lst.size(); ++p) {
@@ -154,15 +241,15 @@ void RandStartPt::getRangesDictFromInString(const std::string& params_ranges_str
         std::string wc_name =params_ranges_string[0];
         if (params_ranges_string[1]=="prev"){
             float factor = 0;
-            if (params_ranges_string[2]!="none"){
-                std::vector<std::string> err_range_string;
-                boost::split(err_range_string, params_ranges_string[2], boost::is_any_of("*"));
-                if (err_range_string.size()==1) factor = 1;
-                else if (err_range_string.size()==2) factor = atof(err_range_string[0].c_str());
-                else std::cout << "Error parsing expression : " << params_ranges_string[2] << std::endl;
-            }
+            bool use_err = parse_range_factor(params_ranges_string[2], factor);
             //dict form: prev value (updated in place), prev error (updated in place), range factor (constant)
-            prev_dict.insert({wc_name,{0,0,factor}});
+            //-1 means that prev error will not be used
+            prev_dict.insert({wc_name,{0, use_err ? 0.f : -1.f, factor}});
+        }
+        else if (params_ranges_string[1]=="ext"){
+            float factor = 0;
+            bool use_err = parse_range_factor(params_ranges_string[2], factor);
+            ext_dict.insert({wc_name,{0, use_err ? 0.f : -1.f, factor}});
         }
         else {
             float lim_lo = atof(params_ranges_string[1].c_str());
@@ -185,7 +272,7 @@ void RandStartPt::commitBestNLLVal(unsigned int idx, float &nllVal, double &prob
                 const auto& poi_name = specifiedvars_[prof_param_idx]->GetName();
                 if (prev_dict_.find(poi_name) != prev_dict_.end()){
                     prev_dict_[poi_name][0] = specifiedvars_[prof_param_idx]->getVal();
-                    prev_dict_[poi_name][1] = specifiedvars_[prof_param_idx]->getError();
+                    if (prev_dict_[poi_name][1]!=-1) prev_dict_[poi_name][1] = specifiedvars_[prof_param_idx]->getError();
 					if (verbosity_ > 1) std::cout << "Updating prev value for " << poi_name << ": " << prev_dict_[poi_name][0] << " +- " << prev_dict_[poi_name][1] << std::endl;
                 }
             }
@@ -222,7 +309,7 @@ void RandStartPt::setDebug(int num, const std::string& ranges) {
     debug_ = true;
     numdebugpts_ = num;
     if (!ranges.empty()) {
-        RandStartPt::getRangesDictFromInString(ranges, debug_ranges_dict_, debug_prev_dict_);
+        RandStartPt::getRangesDictFromInString(ranges, debug_ranges_dict_, debug_prev_dict_, debug_ext_dict_);
     }
     //populate debug prev dict from default prev dict
     if (!prev_dict_.empty()){
@@ -230,7 +317,7 @@ void RandStartPt::setDebug(int num, const std::string& ranges) {
             const auto& poi_name = specifiedvars_[prof_param_idx]->GetName();
             if (prev_dict_.find(poi_name) != prev_dict_.end() and debug_prev_dict_.find(poi_name) != debug_prev_dict_.end()){
                 debug_prev_dict_[poi_name][0] = prev_dict_[poi_name][0];
-                debug_prev_dict_[poi_name][1] = prev_dict_[poi_name][1];
+                if (debug_prev_dict_[poi_name][1]!=-1) debug_prev_dict_[poi_name][1] = prev_dict_[poi_name][1];
             }
         }
     }
@@ -239,8 +326,10 @@ void RandStartPt::setDebug(int num, const std::string& ranges) {
 
 void RandStartPt::doRandomStartPt1DGridScan(double &xval, unsigned int poiSize, std::vector<float> &poival, std::vector<RooRealVar* > &poivars, std::unique_ptr <RooArgSet> &param, RooArgSet &snap, float &deltaNLL, double &nll_init, CascadeMinimizer &minimObj, int &status){
     float current_best_nll = 0;
+    poival[0] = xval;
+    poivars[0]->setVal(xval);
     //the nested vector to hold random starting points to try
-    std::vector<std::vector<float>> nested_vector_of_wc_vals = debug_ ? vectorOfPointsToTry (numdebugpts_, debug_ranges_dict_, debug_prev_dict_) : vectorOfPointsToTry (numrandpts_, rand_ranges_dict_, prev_dict_);
+    std::vector<std::vector<float>> nested_vector_of_wc_vals = debug_ ? vectorOfPointsToTry (poivars, numdebugpts_, debug_ranges_dict_, debug_prev_dict_, debug_ext_dict_) : vectorOfPointsToTry (poivars, numrandpts_, rand_ranges_dict_, prev_dict_, ext_dict_);
     for (unsigned int start_pt_idx = 0; start_pt_idx<nested_vector_of_wc_vals.size(); start_pt_idx++){
         *param = snap;
         poival[0] = xval;
@@ -277,8 +366,12 @@ void RandStartPt::doRandomStartPt1DGridScan(double &xval, unsigned int poiSize, 
 
 void RandStartPt::doRandomStartPt2DGridScan(double &xval, double &yval, unsigned int poiSize, std::vector<float> &poival, std::vector<RooRealVar* > &poivars, std::unique_ptr <RooArgSet> &param, RooArgSet &snap, float &deltaNLL, double &nll_init, MultiDimFit::GridType gridType, double deltaX, double deltaY, CascadeMinimizer &minimObj, int &status){
     float current_best_nll = 0;
+    poival[0] = xval;
+    poival[1] = yval;
+    poivars[0]->setVal(xval);
+    poivars[1]->setVal(yval);
     //the nested vector to hold random starting points to try
-    std::vector<std::vector<float>> nested_vector_of_wc_vals = debug_ ? vectorOfPointsToTry (numdebugpts_, debug_ranges_dict_, debug_prev_dict_) : vectorOfPointsToTry (numrandpts_, rand_ranges_dict_, prev_dict_);
+    std::vector<std::vector<float>> nested_vector_of_wc_vals = debug_ ? vectorOfPointsToTry (poivars, numdebugpts_, debug_ranges_dict_, debug_prev_dict_, debug_ext_dict_) : vectorOfPointsToTry (poivars, numrandpts_, rand_ranges_dict_, prev_dict_, debug_ext_dict_);
     for (unsigned int start_pt_idx = 0; start_pt_idx<nested_vector_of_wc_vals.size(); start_pt_idx++){
         *param = snap;
         poival[0] = xval;

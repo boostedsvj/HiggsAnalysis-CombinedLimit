@@ -11,6 +11,8 @@
 #include "RooAbsReal.h"
 #include "RooArgSet.h"
 #include "RooCategory.h"
+#include "TFile.h"
+#include "TTree.h"
 
 class RandStartPt {
   private:
@@ -35,14 +37,21 @@ class RandStartPt {
       unsigned int nOtherFloatingPOI_;
       std::map<std::string, std::vector<float>> rand_ranges_dict_;
       std::map<std::string, std::vector<float>> prev_dict_;
+      std::map<std::string, std::vector<float>> ext_dict_;
       bool debug_;
       int numdebugpts_;
       std::map<std::string, std::vector<float>> debug_ranges_dict_;
       std::map<std::string, std::vector<float>> debug_prev_dict_;
+      std::map<std::string, std::vector<float>> debug_ext_dict_;
+      std::string extfilename_;
+      std::vector<float> extvals_;
+      std::vector<float> exterrs_;
+      TFile* extfile_;
+      TTree* exttree_;
   public:
-      RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedvars, std::vector<float> &specifiedvals, std::vector<float> &specifiederrs, bool skipdefaultstart, const std::string& parameterRandInitialValranges, int numrandpts, int verbose, bool fastscan, bool hasmaxdeltaNLLforprof, float maxdeltaNLLforprof, std::vector<std::string> &specifiednuis, std::vector<std::string> &specifiedfuncnames, std::vector<RooAbsReal*> &specifiedfunc, std::vector<float> &specifiedfuncvals, std::vector<std::string> &specifiedcatnames, std::vector<RooCategory*> &specifiedcat, std::vector<int> &specifiedcatvals, unsigned int nOtherFloatingPOI);
-      void getRangesDictFromInString(const std::string& params_ranges_string_in, std::map<std::string, std::vector<float>>& ranges_dict, std::map<std::string, std::vector<float>>& prev_dict);
-      std::vector<std::vector<float>> vectorOfPointsToTry (int num, std::map<std::string, std::vector<float>>& ranges_dict, std::map<std::string, std::vector<float>>& prev_dict);
+      RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedvars, std::vector<float> &specifiedvals, std::vector<float> &specifiederrs, bool skipdefaultstart, const std::string& parameterRandInitialValranges, int numrandpts, int verbose, bool fastscan, bool hasmaxdeltaNLLforprof, float maxdeltaNLLforprof, std::vector<std::string> &specifiednuis, std::vector<std::string> &specifiedfuncnames, std::vector<RooAbsReal*> &specifiedfunc, std::vector<float> &specifiedfuncvals, std::vector<std::string> &specifiedcatnames, std::vector<RooCategory*> &specifiedcat, std::vector<int> &specifiedcatvals, unsigned int nOtherFloatingPOI, const std::string& extfilename);
+      void getRangesDictFromInString(const std::string& params_ranges_string_in, std::map<std::string, std::vector<float>>& ranges_dict, std::map<std::string, std::vector<float>>& prev_dict, std::map<std::string, std::vector<float>>& ext_dict);
+      std::vector<std::vector<float>> vectorOfPointsToTry (std::vector<RooRealVar* > &pois, int num, std::map<std::string, std::vector<float>>& ranges_dict, std::map<std::string, std::vector<float>>& prev_dict, std::map<std::string, std::vector<float>>& ext_dict);
       void commitBestNLLVal(unsigned int idx, float &nllVal, double &probVal);
       void setProfPOIvalues(unsigned int startptIdx, std::vector<std::vector<float>> &nested_vector_of_wc_vals);
       void setValSpecifiedObjs();
