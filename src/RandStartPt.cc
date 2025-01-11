@@ -7,6 +7,7 @@
 #include <iostream>
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
 
 #include "TMath.h"
 #include "TFile.h"
@@ -52,6 +53,7 @@ RandStartPt::RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedva
         if (!extfilename_.empty()) {
             extfile_ = TFile::Open(extfilename_.c_str());
             exttree_ = (TTree*)extfile_->Get("limit");
+            if (exttree_->GetEntries()<=0) throw std::runtime_error("Tree limit in file "+extfilename_+" is empty");
             //copy nuisance vectors to use as branches
             extvals_ = specifiedvals_;
             exterrs_ = specifiederrs_;
@@ -87,10 +89,32 @@ std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (std::vector<Ro
 
     // get ext values from tree
     if (!ext_dict.empty()) {
+        // size of grid is unknown, so determine the closest entries
+        std::vector<float> diffs(pois.size(), 0);
+        for (unsigned p = 0; p < pois.size(); ++p){
+            std::stringstream sdiff;
+            sdiff.precision(16);
+            sdiff << "abs(" << pois[p]->GetName() << "-" << pois[p]->getVal() << ")";
+            int ngrid = exttree_->Draw(sdiff.str().c_str(), "", "goff");
+            double* a_diff = exttree_->GetV1();
+            if (ngrid==1) diffs[p] = a_diff[0]*2;
+            else {
+                //sort
+                std::sort(a_diff, a_diff+ngrid);
+                // get unique differences
+                auto last = std::unique(a_diff, a_diff+ngrid);
+                if (std::distance(a_diff, last)==1) diffs[p] = a_diff[0]*2;
+                else {
+                    // get smallest and second-smallest differences
+                    diffs[p] = (a_diff[0]+a_diff[1])*0.5;
+                }
+            }
+        }
+
         std::stringstream scut;
         scut.precision(16);
         for (unsigned p = 0; p < pois.size(); ++p){
-            scut << pois[p]->GetName() << "==" << pois[p]->getVal() << "&&";
+            scut << "abs(" << pois[p]->GetName() << "-" << pois[p]->getVal() << ")<" << diffs[p] << "&&";
         }
         std::string cut = scut.str();
         cut.pop_back(); cut.pop_back();
