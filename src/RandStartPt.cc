@@ -70,14 +70,15 @@ RandStartPt::RandStartPt(RooAbsReal& nll, std::vector<RooRealVar* > &specifiedva
 
 //helper function to compute err-dependent ranges
 namespace {
-bool compute_range(std::map<std::string, std::vector<float>>& val_dict, const std::string& poi_name, float& prof_start_pt_range_max){
+bool compute_range(std::map<std::string, std::vector<float>>& val_dict, const std::string& poi_name, float& prof_start_pt_range_min, float& prof_start_pt_range_max){
     bool no_rand = false;
     float val = val_dict[poi_name][0];
     float err = val_dict[poi_name][1];
     float fac = val_dict[poi_name][2];
     float lo = err!=-1 ? val - fac*err : val - fac*val;
     float hi = err!=-1 ? val + fac*err : val + fac*val;
-    prof_start_pt_range_max = std::max(lo, hi);
+    prof_start_pt_range_min = lo;
+    prof_start_pt_range_max = hi;
     if (fac==0) no_rand = true;
     return no_rand;
 }
@@ -172,6 +173,7 @@ std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (std::vector<Ro
 
     // Append the random points to the vector of points to try
     float prof_start_pt_range_max = 20.0; // Default to 20 if we're not asking for custom ranges
+    float prof_start_pt_range_min = -prof_start_pt_range_max;
 
     for (int pt_idx = 0; pt_idx<num; pt_idx++){
         std::vector<float> wc_vals_vec;
@@ -180,24 +182,25 @@ std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (std::vector<Ro
             if (!parameterRandInitialValranges_.empty()) {
                 const auto& poi_name = specifiedvars_[prof_param_idx]->GetName();
                 if (prev_dict.find(poi_name) != prev_dict.end()){ //if the value from the previous grid step should be used as the initial value
-                    no_rand = compute_range(prev_dict, poi_name, prof_start_pt_range_max);
+                    no_rand = compute_range(prev_dict, poi_name, prof_start_pt_range_min, prof_start_pt_range_max);
                 }
                 else if (ext_dict.find(poi_name) != ext_dict.end()){ //if value from external file should be used as initial value
-                    no_rand = compute_range(ext_dict, poi_name, prof_start_pt_range_max);
+                    no_rand = compute_range(ext_dict, poi_name, prof_start_pt_range_min, prof_start_pt_range_max);
                 }
                 else if (ranges_dict.find(poi_name) != ranges_dict.end()){   //if the random starting point range for this floating POI was supplied during runtime
                     float rand_range_lo = ranges_dict[poi_name][0];
                     float rand_range_hi = ranges_dict[poi_name][1];
                     prof_start_pt_range_max = std::max(abs(rand_range_lo),abs(rand_range_hi));
+                    prof_start_pt_range_min = -prof_start_pt_range_max;
                 }
                 else {   //if the random starting point range for this floating POI was not supplied during runtime, set the default low to -20 and high to +20
-                    ranges_dict.insert({poi_name,{-1*prof_start_pt_range_max,prof_start_pt_range_max}});
+                    ranges_dict.insert({poi_name,{prof_start_pt_range_min,prof_start_pt_range_max}});
                 }
             }
-            if (verbosity_>1 and pt_idx==0) std::cout << "Range for " << specifiedvars_[prof_param_idx]->GetName() << ": " << -1*prof_start_pt_range_max << ", " << prof_start_pt_range_max << " (" << no_rand << ")" << std::endl;
-            //Get a random number in the range [-prof_start_pt_range_max,prof_start_pt_range_max]
+            if (verbosity_>1 and pt_idx==0) std::cout << "Range for " << specifiedvars_[prof_param_idx]->GetName() << ": " << prof_start_pt_range_min << ", " << prof_start_pt_range_max << " (" << no_rand << ")" << std::endl;
+            //Get a random number in the range [prof_start_pt_range_min,prof_start_pt_range_max]
             //unless just using prev value directly w/ no variation
-            float rand_num = no_rand ? prof_start_pt_range_max : (rand()*2.0*prof_start_pt_range_max)/RAND_MAX - prof_start_pt_range_max;
+            float rand_num = no_rand ? prof_start_pt_range_max : prof_start_pt_range_min + float(rand())/(RAND_MAX / (prof_start_pt_range_max - prof_start_pt_range_min));
             wc_vals_vec.push_back(rand_num);
         }
         // avoid redundancy w/ default starting points above
