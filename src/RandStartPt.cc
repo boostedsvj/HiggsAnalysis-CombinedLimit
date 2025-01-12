@@ -194,6 +194,7 @@ std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (std::vector<Ro
                     ranges_dict.insert({poi_name,{-1*prof_start_pt_range_max,prof_start_pt_range_max}});
                 }
             }
+            if (verbosity_>1 and pt_idx==0) std::cout << "Range for " << specifiedvars_[prof_param_idx]->GetName() << ": " << -1*prof_start_pt_range_max << ", " << prof_start_pt_range_max << " (" << no_rand << ")" << std::endl;
             //Get a random number in the range [-prof_start_pt_range_max,prof_start_pt_range_max]
             //unless just using prev value directly w/ no variation
             float rand_num = no_rand ? prof_start_pt_range_max : (rand()*2.0*prof_start_pt_range_max)/RAND_MAX - prof_start_pt_range_max;
