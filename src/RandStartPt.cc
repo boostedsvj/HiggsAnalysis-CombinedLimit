@@ -191,7 +191,8 @@ std::vector<std::vector<float>> RandStartPt::vectorOfPointsToTry (std::vector<Ro
                     float rand_range_lo = ranges_dict[poi_name][0];
                     float rand_range_hi = ranges_dict[poi_name][1];
                     prof_start_pt_range_max = std::max(abs(rand_range_lo),abs(rand_range_hi));
-                    prof_start_pt_range_min = -prof_start_pt_range_max;
+                    if (debug_) prof_start_pt_range_min = std::min(abs(rand_range_lo),abs(rand_range_hi));
+                    else prof_start_pt_range_min = -prof_start_pt_range_max;
                 }
                 else {   //if the random starting point range for this floating POI was not supplied during runtime, set the default low to -20 and high to +20
                     ranges_dict.insert({poi_name,{prof_start_pt_range_min,prof_start_pt_range_max}});
