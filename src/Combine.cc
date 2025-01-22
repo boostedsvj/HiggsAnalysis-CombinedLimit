@@ -1043,7 +1043,14 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
     std::unique_ptr<RooArgSet> vars(genPdf->getVariables());
     algo->setNToys(nToys);
 
-    for (iToy = 1; iToy <= nToys; ++iToy) {
+    int minToy = 1;
+    int maxToy = nToys;
+    if (iToy>0 and readToysFromHere!=nullptr){
+      //tIsToyIndex case
+      minToy = iToy;
+      maxToy = iToy;
+    }
+    for (iToy = minToy; iToy <= maxToy; ++iToy) {
 
       // Reset ranges --> for likelihood scans
       if (setPhysicsModelParameterRangeExpression_ != "") {

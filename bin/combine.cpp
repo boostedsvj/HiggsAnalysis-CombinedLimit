@@ -46,6 +46,7 @@ int main(int argc, char **argv) {
   int runToys;
   int    seed;
   string toysFile;
+  bool tIsToyIndex = false;
 
   vector<string> librariesToLoad;
   vector<string> runtimeDefines;
@@ -98,6 +99,7 @@ int main(int argc, char **argv) {
     ("dataset,D",  po::value<string>(&dataset)->default_value("data_obs"), "Name of the dataset for observed limit - use this to replace dataset in workspace for example with a toy dataset. Format as file:workspace:object or file:object")
     ("dataMapName",  po::value<string>(&dataMapName)->default_value("data_obs"), "Name of the dataset for observed limit pattern in the datacard")
     ("toysFile",   po::value<string>(&toysFile)->default_value(""), "Read toy mc or other intermediate results from this file")
+    ("tIsToyIndex", "The value of the -t/--toys argument is treated as an index to select a specific toy from --toysFiles")
     ;
   combiner.miscOptions().add_options()
     ("igpMem", "Setup support for memory profiling using IgProf")
@@ -177,6 +179,7 @@ int main(int argc, char **argv) {
     cerr << "Unidentified error parsing options." << endl;
     return 1000;
   }
+  tIsToyIndex = vm0.count("tIsToyIndex");
 
   if(datacard == "") {
     cerr << "Missing datacard file" << endl;
@@ -333,6 +336,8 @@ int main(int argc, char **argv) {
   }
 
   try {
+     iToy = 0;
+     if (tIsToyIndex and readToysFromHere!=nullptr and runToys>0) iToy = runToys;
      combiner.run(datacard, dataset, limit, limitErr, iToy, t, runToys);
      if (verbose>0) CombineLogger::instance().printLog(); 
   } catch (std::exception &ex) {
